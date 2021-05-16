@@ -65,14 +65,16 @@ char ts[21],ts2[10],configfilename[32];
 byte present = 0;
 byte data[12];
 int brightness=0;
-int timezoneoffset,daylightsavingoffset;
+int timezoneoffset,daylightsavingoffset,twelvehour;
 char strtimezoneoffset[11]="600",strdaylightsavingoffset[11]="60";
 bool shouldSaveConfig = false;
+WiFiManager wm;
+WiFiManagerParameter custom_field;
 
 //----------------------------------------------------------------------------------
 //callback notifying us of the need to save config
-void saveConfigCallback () {
-  Serial.println("Should save config");
+void cbSaveConfig () {
+  Serial.println(F("Should save config"));
   shouldSaveConfig=true;
 }
 //----------------------------------------------------------------------------------
@@ -81,16 +83,16 @@ void saveConfigCallback () {
   // LittleFS.format();
 
   //read configuration from FS json
-  Serial.println("mounting FS...");
+  Serial.println(F("mounting FS..."));
 
   if (LittleFS.begin()){
-    Serial.println("mounted file system");
-    if (LittleFS.exists("/config.json")) {
+    Serial.println(F("mounted file system"));
+    if (LittleFS.exists(F("/config.json"))) {
       //file exists, reading and loading
-      Serial.println("reading config file");
+      Serial.println(F("reading config file"));
       File configFile = LittleFS.open("/config.json","r");
       if (configFile) {
-        Serial.println("opened config file");
+        Serial.println(F("opened config file"));
         size_t size = configFile.size();
         // Allocate a buffer to store contents of the file.
         std::unique_ptr<char[]> buf(new char[size]);
@@ -107,22 +109,25 @@ void saveConfigCallback () {
 
         timezoneoffset=json["timezoneoffset"];
         daylightsavingoffset=json["daylightsavingoffset"];
+        twelvehour=json["twelvehour"];
         Serial.print("timezoneoffset: ");
         Serial.println(timezoneoffset);
         Serial.print("daylightsavingoffset: ");
         Serial.println(daylightsavingoffset);
+        Serial.print("twelvehour: ");
+        Serial.println(twelvehour);
         }
       else{
-        Serial.println("failed to load json config");
+        Serial.println(F("failed to load json config"));
         }
       }
     }
     else{
-      Serial.println("failed to mount FS");
+      Serial.println(F("failed to mount FS"));
       }
   }
 //----------------------------------------------------------------------------------
-void cbtick1(){
+void cbTick1(){
     tick1Occured=true;
 }
 //----------------------------------------------------------------------------------
@@ -183,12 +188,27 @@ void sendNTPpacket(IPAddress &address)
   udp.endPacket();
 }
 //----------------------------------------------------------------------------------
+void cbSaveParams(){
+  Serial.println(F("[CALLBACK] cbSaveParams fired"));
+  Serial.println("PARAM twelvehour = " + getParam("twelvehour"));
+//  twelvehour=getParam("twelvehour")=="1";
+  twelvehour=(getParam(F("twelvehour"))).toInt();
+//  Serial.println(twelvehour);
+}
+//----------------------------------------------------------------------------------
+String getParam(String name){
+  //read parameter from server, for customhmtl input
+  String value="";
+  if(wm.server->hasArg(name)) {
+    value = wm.server->arg(name);
+  }
+  return value;
+}
+//----------------------------------------------------------------------------------
 void setup(){
-  WiFiManager wm;
-
   Serial.begin(9600);
   while (!Serial){;} // wait for serial port to connect. Needed for Leonardo only
-  Serial.println("serial started");
+  Serial.println(F("serial started"));
 
   Serial.print(F("\nSketch size: "));
   Serial.print(ESP.getSketchSize());
@@ -196,7 +216,7 @@ void setup(){
   Serial.print(ESP.getFreeSketchSpace());
   Serial.print(F("\n\n"));
 
-  wm.setSaveConfigCallback(saveConfigCallback);
+  wm.setSaveConfigCallback(cbSaveConfig);
   getconfig();
 
   // setup custom parameters
@@ -206,6 +226,20 @@ void setup(){
   WiFiManagerParameter custom_daylightsavingoffset("daylightsavingoffset","daylightsavingoffset",strdaylightsavingoffset,10);
   wm.addParameter(&custom_timezoneoffset);
   wm.addParameter(&custom_daylightsavingoffset);
+  String custom_radio_str;
+  custom_radio_str.reserve(500);
+  custom_radio_str=F("<p>Select 12/24 hour display:</p>");
+  custom_radio_str+=F("<input style='width: auto; margin: 0 10px 0 10px;' type='radio' name='twelvehour' value='0' ");
+  if(!twelvehour)custom_radio_str+=F("checked ");
+  custom_radio_str+=F(">24 hour<br>");
+  custom_radio_str+=F("<input style='width: auto; margin: 0 10px 0 10px;' type='radio' name='twelvehour' value='1' ");
+  if(twelvehour)custom_radio_str+=F("checked ");
+  custom_radio_str+=F(">12 hour<br>");
+//  Serial.println(custom_radio_str);
+  new (&custom_field) WiFiManagerParameter(custom_radio_str.c_str()); // custom html input
+  wm.addParameter(&custom_field);
+  wm.setSaveParamsCallback(cbSaveParams);
+
   //reset settings - wipe credentials for testing
   //wm.resetSettings();
  
@@ -223,15 +257,18 @@ void setup(){
 
   timezoneoffset=atoi(custom_timezoneoffset.getValue());
   daylightsavingoffset=atoi(custom_daylightsavingoffset.getValue());
+  //twelvehour result is collected by cbSaveParams()
+
   if(shouldSaveConfig){
     //save the custom parameters to FS
-    Serial.println("saving config");
+    Serial.println(F("saving config"));
     DynamicJsonDocument doc(200);
-    doc["timezoneoffset"] = timezoneoffset;
-    doc["daylightsavingoffset"] = daylightsavingoffset;
+    doc["timezoneoffset"]=timezoneoffset;
+    doc["daylightsavingoffset"]=daylightsavingoffset;
+    doc["twelvehour"]=twelvehour;
     File configFile = LittleFS.open("/config.json", "w");
     if (!configFile) {
-      Serial.println("failed to open config file for writing");
+      Serial.println(F("failed to open config file for writing"));
     }
     char output[200];
     serializeJsonPretty(doc,output,200);
@@ -270,8 +307,7 @@ void setup(){
     seg.setDigits(4);
 #endif
 
-//  ticker1.attach_ms(1000,cbtick1);
-  ticker1.attach_ms(500,cbtick1);
+  ticker1.attach_ms(500,cbTick1);
 }
 //----------------------------------------------------------------------------------
 void loop(){
@@ -279,8 +315,14 @@ void loop(){
     tick1Occured = false;
     t=now()+timezoneoffset*60;
     if(!digitalRead(nDST))t+=daylightsavingoffset*60;
-    if(!digitalRead(nMMSS))sprintf(ts2,"%02d%02d",minute(t),second(t)); 
-    else sprintf(ts2,"%02d%02d",hour(t),minute(t));
+    if(twelvehour){
+      if(!digitalRead(nMMSS))sprintf(ts2,"%02d%02d",minute(t),second(t));
+      else sprintf(ts2,"%02d%02d",hourFormat12(t),minute(t));
+      }
+    else{
+      if(!digitalRead(nMMSS))sprintf(ts2,"%02d%02d",minute(t),second(t));
+      else sprintf(ts2,"%02d%02d",hour(t),minute(t));
+      }
     String ts6=ts2;
     Serial.println(ts6);
 #if DISPLAY==TM1637
