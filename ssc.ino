@@ -1,8 +1,8 @@
 //HT16K33 1.2" display
 //TM1637 https://github.com/AKJ7/TM1637
 //74HC595
-#define HHMM 14 //D5
-#define DST 12 //D6
+#define nMMSS 14 //D5
+#define nDST 12 //D6
 //#define DISPLAY TM1637
 #define DISPLAY SR74HC595
 //#define DISPLAY HT16K33
@@ -269,7 +269,6 @@ void setup(){
     seg.displayOn();
     seg.setDigits(4);
 #endif
-  WiFi.mode(WIFI_OFF);
 
 //  ticker1.attach_ms(1000,cbtick1);
   ticker1.attach_ms(500,cbtick1);
@@ -279,9 +278,9 @@ void loop(){
   if (tick1Occured == true){
     tick1Occured = false;
     t=now()+timezoneoffset*60;
-    if(!digitalRead(DST))t+=daylightsavingoffset*60;
-    if(!digitalRead(HHMM)) sprintf(ts2,"%02d%02d",hour(t),minute(t));
-    else sprintf(ts2,"%02d%02d",minute(t),second(t));
+    if(!digitalRead(nDST))t+=daylightsavingoffset*60;
+    if(!digitalRead(nMMSS))sprintf(ts2,"%02d%02d",minute(t),second(t)); 
+    else sprintf(ts2,"%02d%02d",hour(t),minute(t));
     String ts6=ts2;
     Serial.println(ts6);
 #if DISPLAY==TM1637
