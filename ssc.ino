@@ -3,8 +3,8 @@
 //74HC595
 #define nMMSS 14 //D5
 #define nDST 12 //D6
-//#define DISPLAY TM1637
-#define DISPLAY SR74HC595
+#define DISPLAY TM1637
+//#define DISPLAY SR74HC595
 //#define DISPLAY HT16K33
 //SNTP syncronised clock for ESP8266 - NodeMCU 1.0 (ESP-12E Module)
 //Copyright: Owen Duffy    2021/05/16
@@ -20,7 +20,7 @@
 
 #if DISPLAY==TM1637
 #include <TM1637.h>
-TM1637 tm(0,2); //clk,data D3,D4
+TM1637 tm(5,2); //clk,data D1,D4
 #endif
 #if DISPLAY==SR74HC595
 #include <ShiftDisplay2.h>
@@ -49,7 +49,7 @@ HT16K33 seg(0x70);
 #include <WiFiManager.h>
 
 const char ver[]="0.01";
-char hostname[11]="sclk01";
+char hostname[11]="ssc01";
 int t=0;
 char name[21];
 int i,j,ticks,interval;
@@ -64,9 +64,9 @@ String currentUri((char *)0);
 char ts[21],ts2[10],configfilename[32];
 byte present = 0;
 byte data[12];
-int brightness=0;
+int brightness=100;
 int timezoneoffset,daylightsavingoffset,twelvehour;
-char strtimezoneoffset[11]="600",strdaylightsavingoffset[11]="60";
+char strtimezoneoffset[11]="600",strdaylightsavingoffset[11]="60",strbrightness[11]="100";
 bool shouldSaveConfig = false;
 WiFiManager wm;
 WiFiManagerParameter custom_field;
@@ -109,11 +109,14 @@ void cbSaveConfig () {
 
         timezoneoffset=json["timezoneoffset"];
         daylightsavingoffset=json["daylightsavingoffset"];
+        brightness=json["brightness"];
         twelvehour=json["twelvehour"];
         Serial.print("timezoneoffset: ");
         Serial.println(timezoneoffset);
         Serial.print("daylightsavingoffset: ");
         Serial.println(daylightsavingoffset);
+        Serial.print("brightness: ");
+        Serial.println(brightness);
         Serial.print("twelvehour: ");
         Serial.println(twelvehour);
         }
@@ -222,10 +225,12 @@ void setup(){
   // setup custom parameters
   snprintf(strtimezoneoffset,sizeof(strtimezoneoffset),"%d",timezoneoffset);
   snprintf(strdaylightsavingoffset,sizeof(strdaylightsavingoffset),"%d",daylightsavingoffset);
-  WiFiManagerParameter custom_timezoneoffset("timezoneoffset","timezoneoffset",strtimezoneoffset,10);
-  WiFiManagerParameter custom_daylightsavingoffset("daylightsavingoffset","daylightsavingoffset",strdaylightsavingoffset,10);
+  WiFiManagerParameter custom_timezoneoffset("timezoneoffset","Time zone offset (min)",strtimezoneoffset,10);
+  WiFiManagerParameter custom_daylightsavingoffset("daylightsavingoffset","Daylight saving offset (min)",strdaylightsavingoffset,10);
+  WiFiManagerParameter custom_brightness("brightness","Brightness (0-100)",strbrightness,10);
   wm.addParameter(&custom_timezoneoffset);
   wm.addParameter(&custom_daylightsavingoffset);
+  wm.addParameter(&custom_brightness);
   String custom_radio_str;
   custom_radio_str.reserve(500);
   custom_radio_str=F("<p>Select 12/24 hour display:</p>");
@@ -265,6 +270,7 @@ void setup(){
     DynamicJsonDocument doc(200);
     doc["timezoneoffset"]=timezoneoffset;
     doc["daylightsavingoffset"]=daylightsavingoffset;
+    doc["brightness"]=brightness;
     doc["twelvehour"]=twelvehour;
     File configFile = LittleFS.open("/config.json", "w");
     if (!configFile) {
@@ -294,11 +300,11 @@ void setup(){
     Serial.println(F("waiting for sync"));
     setSyncProvider(getNtpTime);
     timeset=timeStatus()==timeSet;
-    setSyncInterval(36000);
+    setSyncInterval(8*3600);
     }
 #if DISPLAY==TM1637
     tm.init();
-    tm.setBrightness(7);
+    tm.setBrightness(brightness*7/100);
 #endif
 #if DISPLAY==HT16K33
     seg.begin(2,0);//data,clk D4,D3
@@ -317,14 +323,14 @@ void loop(){
     if(!digitalRead(nDST))t+=daylightsavingoffset*60;
     if(twelvehour){
       if(!digitalRead(nMMSS))sprintf(ts2,"%02d%02d",minute(t),second(t));
-      else sprintf(ts2,"%02d%02d",hourFormat12(t),minute(t));
+      else sprintf(ts2,"%2d%02d",hourFormat12(t),minute(t));
       }
     else{
       if(!digitalRead(nMMSS))sprintf(ts2,"%02d%02d",minute(t),second(t));
-      else sprintf(ts2,"%02d%02d",hour(t),minute(t));
+      else sprintf(ts2,"%2d%02d",hour(t),minute(t));
       }
     String ts6=ts2;
-    Serial.println(ts6);
+//    Serial.println(ts6);
 #if DISPLAY==TM1637
     tm.display(ts6);
     tm.switchColon();
