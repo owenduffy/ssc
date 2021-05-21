@@ -73,6 +73,7 @@ bool shouldSaveConfig = false;
 WiFiManager wm;
 WiFiManagerParameter custom_field;
 int loopctr=0;
+bool dim;
 
 //----------------------------------------------------------------------------------
 //callback notifying us of the need to save config
@@ -327,8 +328,9 @@ void loop(){
     t=now()+timezoneoffset*60;
     if(!digitalRead(nDST))t+=daylightsavingoffset*60;
 #ifdef HAVE_TM1637
-    if(!digitalRead(nDIM))tm.setBrightness(brightness*7/100);
-    else tm.setBrightness(brightness*7/400);
+    if(!(loopctr&0x7f))dim=digitalRead(nDIM);
+    if(dim)tm.setBrightness(brightness*7/400);
+    else tm.setBrightness(brightness*7/100);
     if(twelvehour){
       if(!digitalRead(nMMSS))sprintf(ts2,"%02d%02d",minute(t),second(t));
       else sprintf(ts2,"%2d%02d",hourFormat12(t),minute(t));
@@ -357,8 +359,10 @@ void loop(){
     sr.update();
 #endif
 #ifdef HAVE_HT16K33
-    if(!digitalRead(nDIM))seg.brightness(brightness*15/100);
-    else seg.brightness(brightness*15/400);
+    if(!(loopctr&0x7f))dim=digitalRead(nDIM);
+  Serial.println(dim);
+      if(dim)seg.brightness(brightness*15/400);
+    else seg.brightness(brightness*15/100);
 if(twelvehour){
       if(!digitalRead(nMMSS))seg.displayTime(minute(t),second(t),loopctr%2,true);
       else seg.displayTime(hourFormat12(t),minute(t),loopctr%2,false);
