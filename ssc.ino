@@ -1,13 +1,16 @@
-//HT16K33 1.2" display
-//TM1637 https://github.com/AKJ7/TM1637
-//74HC595
-#define nMMSS 14 //D5
-#define nDST 12 //D6
-#define DISPLAY TM1637
-//#define DISPLAY SR74HC595
-//#define DISPLAY HT16K33
 //SNTP syncronised clock for ESP8266 - NodeMCU 1.0 (ESP-12E Module)
 //Copyright: Owen Duffy    2021/05/16
+
+#define nMMSS 14 //D5
+#define nDST 12 //D6
+#define nDIM 13 //D7
+#define PIN_CLK 5 //D1
+#define PIN_DATA 4 //D2
+#define PIN_LATCH 0 //D3
+
+//#define HAVE_TM1637
+//#define HAVE_SR74HC595
+#define HAVE_HT16K33
 
 #include <LittleFS.h>
 #include <ArduinoJson.h> // https://github.com/bblanchon/ArduinoJson
@@ -18,16 +21,15 @@
 #include <Ticker.h>
 #include <DNSServer.h>
 
-#if DISPLAY==TM1637
+#ifdef HAVE_TM1637 //https://github.com/AKJ7/TM1637
 #include <TM1637.h>
-TM1637 tm(5,2); //clk,data D1,D4
+TM1637 tm(PIN_CLK,PIN_DATA); //clk,data
 #endif
-#if DISPLAY==SR74HC595
+#ifdef HAVE_SR74HC595 //https://github.com/ameer1234567890/ShiftDisplay2
 #include <ShiftDisplay2.h>
-//ShiftDisplay2 sr(4,0,2,COMMON_ANODE,4,STATIC_DRIVE); //latchPin,clockPin,dataPin D2,D3,D4
-ShiftDisplay2 sr(4,5,2,COMMON_ANODE,4,STATIC_DRIVE); //latchPin,clockPin,dataPin D2,D1,D4
+ShiftDisplay2 sr(PIN_LATCH,PIN_CLK,PIN_DATA,COMMON_ANODE,4,STATIC_DRIVE); //latchPin,clockPin,dataPin
 #endif
-#if DISPLAY==HT16K33
+#ifdef HAVE_HT16K33 //https://github.com/RobTillaart/HT16K33
 #include "HT16K33.h"
 HT16K33 seg(0x70);
 #endif
@@ -70,6 +72,7 @@ char strtimezoneoffset[11]="600",strdaylightsavingoffset[11]="60",strbrightness[
 bool shouldSaveConfig = false;
 WiFiManager wm;
 WiFiManagerParameter custom_field;
+int loopctr=0;
 
 //----------------------------------------------------------------------------------
 //callback notifying us of the need to save config
@@ -302,15 +305,16 @@ void setup(){
     timeset=timeStatus()==timeSet;
     setSyncInterval(8*3600);
     }
-#if DISPLAY==TM1637
+#ifdef HAVE_TM1637
     tm.init();
-    tm.setBrightness(brightness*7/100);
+//    tm.setBrightness(brightness*7/100);
 #endif
-#if DISPLAY==HT16K33
-    seg.begin(2,0);//data,clk D4,D3
+#ifdef HAVE_HT16K33
+    seg.begin(PIN_DATA,PIN_CLK);//data,clk
     Wire.setClock(100000);
     seg.displayOn();
     seg.setDigits(4);
+//    seg.brightness(brightness*15/100);
 #endif
 
   ticker1.attach_ms(500,cbTick1);
@@ -319,8 +323,12 @@ void setup(){
 void loop(){
   if (tick1Occured == true){
     tick1Occured = false;
+    loopctr=loopctr+1;
     t=now()+timezoneoffset*60;
     if(!digitalRead(nDST))t+=daylightsavingoffset*60;
+#ifdef HAVE_TM1637
+    if(!digitalRead(nDIM))tm.setBrightness(brightness*7/100);
+    else tm.setBrightness(brightness*7/400);
     if(twelvehour){
       if(!digitalRead(nMMSS))sprintf(ts2,"%02d%02d",minute(t),second(t));
       else sprintf(ts2,"%2d%02d",hourFormat12(t),minute(t));
@@ -330,23 +338,35 @@ void loop(){
       else sprintf(ts2,"%2d%02d",hour(t),minute(t));
       }
     String ts6=ts2;
-//    Serial.println(ts6);
-#if DISPLAY==TM1637
     tm.display(ts6);
     tm.switchColon();
     tm.refresh();
-//    brightness+=1;
-//    brightness=brightness%16;
-//    tm.setBrightness(brightness/2);
 #endif
-#if DISPLAY==SR74HC595
+#ifdef HAVE_SR74HC595
+    if(twelvehour){
+      if(!digitalRead(nMMSS))sprintf(ts2,"%02d%02d",minute(t),second(t));
+      else sprintf(ts2,"%2d%02d",hourFormat12(t),minute(t));
+      }
+    else{
+      if(!digitalRead(nMMSS))sprintf(ts2,"%02d%02d",minute(t),second(t));
+      else sprintf(ts2,"%2d%02d",hour(t),minute(t));
+      }
+    String ts6=ts2;
     sr.clear();
     sr.set(ts2);
     sr.update();
 #endif
-#if DISPLAY==HT16K33
-    seg.displayTime(hour(t),minute(t));
-    seg.displayColon(1);
+#ifdef HAVE_HT16K33
+    if(!digitalRead(nDIM))seg.brightness(brightness*15/100);
+    else seg.brightness(brightness*15/400);
+if(twelvehour){
+      if(!digitalRead(nMMSS))seg.displayTime(minute(t),second(t),loopctr%2,true);
+      else seg.displayTime(hourFormat12(t),minute(t),loopctr%2,false);
+      }
+    else{
+      if(!digitalRead(nMMSS))seg.displayTime(minute(t),second(t),loopctr%2,true);
+      else seg.displayTime(hour(t),minute(t),loopctr%2,false);
+      }
 #endif
   }
 }
