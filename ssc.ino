@@ -360,7 +360,6 @@ void loop(){
 #endif
 #ifdef HAVE_HT16K33
     if(!(loopctr&0x7f))dim=digitalRead(nDIM);
-  Serial.println(dim);
       if(dim)seg.brightness(brightness*15/400);
     else seg.brightness(brightness*15/100);
 if(twelvehour){
