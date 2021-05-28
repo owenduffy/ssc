@@ -66,7 +66,7 @@ String currentUri((char *)0);
 char ts[21],ts2[10],configfilename[32];
 byte present = 0;
 byte data[12];
-int brightness=100;
+float brightness=100.25;
 int timezoneoffset,daylightsavingoffset,twelvehour;
 char strtimezoneoffset[11]="600",strdaylightsavingoffset[11]="60",strbrightness[11]="100";
 bool shouldSaveConfig = false;
@@ -114,6 +114,7 @@ void cbSaveConfig () {
         timezoneoffset=json["timezoneoffset"];
         daylightsavingoffset=json["daylightsavingoffset"];
         brightness=json["brightness"];
+        if(fmod(brightness,1)==0)brightness*=1.0025;
         twelvehour=json["twelvehour"];
         Serial.print("timezoneoffset: ");
         Serial.println(timezoneoffset);
@@ -200,6 +201,8 @@ void cbSaveParams(){
   Serial.println("PARAM twelvehour = " + getParam("twelvehour"));
 //  twelvehour=getParam("twelvehour")=="1";
   twelvehour=(getParam(F("twelvehour"))).toInt();
+  brightness=(getParam(F("brightness"))).toFloat();
+  if(fmod(brightness,1)==0)brightness*=1.25;
 //  Serial.println(twelvehour);
 }
 //----------------------------------------------------------------------------------
@@ -308,14 +311,12 @@ void setup(){
     }
 #ifdef HAVE_TM1637
     tm.init();
-//    tm.setBrightness(brightness*7/100);
 #endif
 #ifdef HAVE_HT16K33
     seg.begin(PIN_DATA,PIN_CLK);//data,clk
     Wire.setClock(100000);
     seg.displayOn();
     seg.setDigits(4);
-//    seg.brightness(brightness*15/100);
 #endif
 
   ticker1.attach_ms(500,cbTick1);
@@ -324,13 +325,12 @@ void setup(){
 void loop(){
   if (tick1Occured == true){
     tick1Occured = false;
-    loopctr=loopctr+1;
     t=now()+timezoneoffset*60;
     if(!digitalRead(nDST))t+=daylightsavingoffset*60;
 #ifdef HAVE_TM1637
-    if(!(loopctr&0x7f))dim=digitalRead(nDIM);
-    if(dim)tm.setBrightness(brightness*7/400);
-    else tm.setBrightness(brightness*7/100);
+    if(!(loopctr&0x3f))dim=digitalRead(nDIM);
+    if(dim)tm.setBrightness(max(int(fmod(brightness,1)*7),1));
+    else tm.setBrightness(int(max(int(brightness)*7/100,1)));
     if(twelvehour){
       if(!digitalRead(nMMSS))sprintf(ts2,"%02d%02d",minute(t),second(t));
       else sprintf(ts2,"%2d%02d",hourFormat12(t),minute(t));
@@ -360,9 +360,9 @@ void loop(){
 #endif
 #ifdef HAVE_HT16K33
     if(!(loopctr&0x7f))dim=digitalRead(nDIM);
-      if(dim)seg.brightness(brightness*15/400);
-    else seg.brightness(brightness*15/100);
-if(twelvehour){
+    if(dim)seg.brightness(max(int(fmod(brightness,1)*15),1));
+    else seg.brightness(int(max(int(brightness)*15/100,1)));
+    if(twelvehour){
       if(!digitalRead(nMMSS))seg.displayTime(minute(t),second(t),loopctr%2,true);
       else seg.displayTime(hourFormat12(t),minute(t),loopctr%2,false);
       }
@@ -371,5 +371,6 @@ if(twelvehour){
       else seg.displayTime(hour(t),minute(t),loopctr%2,false);
       }
 #endif
+  loopctr=loopctr+1;
   }
 }
