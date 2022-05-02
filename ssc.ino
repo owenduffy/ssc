@@ -1,9 +1,11 @@
 //SNTP syncronised clock for ESP8266 - NodeMCU 1.0 (ESP-12E Module)
 //Copyright: Owen Duffy    2021/05/16
 
+#define VERSION "0.01"
+
 #define nMMSS 14 //D5
 #define nDST 12 //D6
-#define nDIM 13 //D7
+#define nDIM 13 //D7 +3.3-220k-nDim-phototransistor-gnd
 #define PIN_CLK 5 //D1
 #define PIN_DATA 4 //D2
 #define PIN_LATCH 0 //D3
@@ -17,9 +19,7 @@
 #include <TimeLib.h>
 #include <Wire.h> 
 #include <LiquidCrystal_I2C.h>
-#include <WiFiUdp.h>
 #include <Ticker.h>
-#include <DNSServer.h>
 
 #ifdef HAVE_TM1637 //https://github.com/AKJ7/TM1637
 #include <TM1637.h>
@@ -41,6 +41,9 @@ HT16K33 seg(0x70);
 #include <WiFi.h>
 //#include <WebServer.h>
 #endif
+#include <WiFiUdp.h>
+#include <DNSServer.h>
+
 //#include <OneWire.h>
 //#include <PageBuilder.h>
 #if defined(ARDUINO_ARCH_ESP8266)
@@ -50,8 +53,12 @@ HT16K33 seg(0x70);
 #endif
 #include <WiFiManager.h>
 
-const char ver[]="0.01";
+//const char ver[]=VERSION;
 char hostname[11]="ssc01";
+//Need global visibility of the config stuff
+DynamicJsonDocument doc(300);//arduinojson.org/assistant
+JsonObject json;
+int cfgver=0;
 int t=0;
 char name[21];
 int i,j,ticks,interval;
@@ -82,7 +89,7 @@ void cbSaveConfig () {
   shouldSaveConfig=true;
 }
 //----------------------------------------------------------------------------------
-  void getconfig(){
+  int getconfig(){
   //clean FS, for testing
   // LittleFS.format();
 
@@ -90,49 +97,69 @@ void cbSaveConfig () {
   Serial.println(F("mounting FS..."));
 
   if (LittleFS.begin()){
-    Serial.println(F("mounted file system"));
+    Serial.println(F("Mounted file system"));
     if (LittleFS.exists(F("/config.json"))) {
       //file exists, reading and loading
-      Serial.println(F("reading config file"));
-      File configFile = LittleFS.open("/config.json","r");
-      if (configFile) {
-        Serial.println(F("opened config file"));
+      Serial.println(F("Reading config file"));
+      File configFile=LittleFS.open("/config.json","r");
+      if(configFile){
+        Serial.println(F("Opened config file"));
         size_t size = configFile.size();
         // Allocate a buffer to store contents of the file.
-        std::unique_ptr<char[]> buf(new char[size]);
-
-        configFile.readBytes(buf.get(), size);
-        DynamicJsonDocument doc(200); //https://arduinojson.org/v6/assistant/
-        DeserializationError error = deserializeJson(doc, buf.get());
-        if (error) {
+        static char* buf=new char[size];
+        configFile.readBytes(buf,size);
+        DeserializationError error=deserializeJson(doc, buf);
+        if(error){
           Serial.println(F("Failed to load JSON config"));
-          while(1);
+          return 1;
           }
-        JsonObject json = doc.as<JsonObject>();
+        json=doc.as<JsonObject>();
         Serial.println(F("\nParsed json"));
 
-        timezoneoffset=json["timezoneoffset"];
-        daylightsavingoffset=json["daylightsavingoffset"];
-        brightness=json["brightness"];
+        if(json[F("cfgver")]){
+          cfgver=json[F("cfgver")];
+//          Serial.print(F("debug config.json version: "));
+//          Serial.println(cfgver);
+          }
+        if(cfgver!=1){
+          Serial.print(F("Incompatible config.cfg version: "));
+          Serial.println(cfgver);
+          return 1;
+        }
+        if(json[F("hostname")]){
+//          Serial.println("found hostname");
+          strncpy(hostname,json[F("hostname")],sizeof(hostname)-1);
+          hostname[sizeof(hostname)]='\0';
+        }
+        timezoneoffset=json[F("timezoneoffset")];
+        daylightsavingoffset=json[F("daylightsavingoffset")];
+        brightness=json[F("brightness")];
         if(fmod(brightness,1)==0)brightness*=1.0025;
-        twelvehour=json["twelvehour"];
-        Serial.print("timezoneoffset: ");
+        twelvehour=json[F("twelvehour")];
+        Serial.print(F("hostname: "));
+        Serial.println(hostname);
+        Serial.print(F("timezoneoffset: "));
         Serial.println(timezoneoffset);
-        Serial.print("daylightsavingoffset: ");
+        Serial.print(F("daylightsavingoffset: "));
         Serial.println(daylightsavingoffset);
-        Serial.print("brightness: ");
+        Serial.print(F("brightness: "));
         Serial.println(brightness);
-        Serial.print("twelvehour: ");
+        Serial.print(F("twelvehour: "));
         Serial.println(twelvehour);
+        return 0;
         }
       else{
-        Serial.println(F("failed to load json config"));
+        Serial.println(F("Config file open failed"));
         }
       }
-    }
+      else{
+        Serial.println(F("Config file not exit"));
+        }
+      }
     else{
       Serial.println(F("failed to mount FS"));
       }
+  return 1;
   }
 //----------------------------------------------------------------------------------
 void cbTick1(){
@@ -216,9 +243,13 @@ String getParam(String name){
 }
 //----------------------------------------------------------------------------------
 void setup(){
+  WiFi.mode(WIFI_OFF);
+  //WiFi.setAutoConnect(true);
   Serial.begin(9600);
   while (!Serial){;} // wait for serial port to connect. Needed for Leonardo only
   Serial.println(F("serial started"));
+  Serial.print("\n\nStarting ssc v");
+  Serial.println(VERSION);
 
   Serial.print(F("\nSketch size: "));
   Serial.print(ESP.getSketchSize());
@@ -226,15 +257,16 @@ void setup(){
   Serial.print(ESP.getFreeSketchSpace());
   Serial.print(F("\n\n"));
 
-  wm.setSaveConfigCallback(cbSaveConfig);
   getconfig();
-
+  wm.setSaveConfigCallback(cbSaveConfig);
   // setup custom parameters
   snprintf(strtimezoneoffset,sizeof(strtimezoneoffset),"%d",timezoneoffset);
   snprintf(strdaylightsavingoffset,sizeof(strdaylightsavingoffset),"%d",daylightsavingoffset);
+  WiFiManagerParameter custom_hostname("hostname","hostname",hostname,sizeof(hostname)-1);
   WiFiManagerParameter custom_timezoneoffset("timezoneoffset","Time zone offset (min)",strtimezoneoffset,10);
   WiFiManagerParameter custom_daylightsavingoffset("daylightsavingoffset","Daylight saving offset (min)",strdaylightsavingoffset,10);
   WiFiManagerParameter custom_brightness("brightness","Brightness (0-100)",strbrightness,10);
+  wm.addParameter(&custom_hostname);
   wm.addParameter(&custom_timezoneoffset);
   wm.addParameter(&custom_daylightsavingoffset);
   wm.addParameter(&custom_brightness);
@@ -255,18 +287,24 @@ void setup(){
   //reset settings - wipe credentials for testing
   //wm.resetSettings();
  
-  WiFi.hostname(hostname);
   wm.setDebugOutput(true);
   wm.setHostname(hostname);
   wm.setConfigPortalTimeout(120);
-  Serial.println(F("Connecting..."));
-  Serial.print(WiFi.hostname());
   Serial.print(F(" connecting to "));
   Serial.println(WiFi.SSID());
-  wm.autoConnect("scccfg");
+  wm.autoConnect(hostname);
+  if(WiFi.status()!=WL_CONNECTED)
+    {
+      Serial.println("WiFi autoconnect failed, resetting...");
+      ESP.restart(); //soft reboot
+      delay(1000);
+    }
+  
   if(WiFi.status()==WL_CONNECTED){
     Serial.println(WiFi.localIP().toString().c_str());
 
+  strncpy(hostname,custom_hostname.getValue(),sizeof(hostname)-1);
+  hostname[sizeof(hostname)]='\0';
   timezoneoffset=atoi(custom_timezoneoffset.getValue());
   daylightsavingoffset=atoi(custom_daylightsavingoffset.getValue());
   //twelvehour result is collected by cbSaveParams()
@@ -275,6 +313,8 @@ void setup(){
     //save the custom parameters to FS
     Serial.println(F("saving config"));
     DynamicJsonDocument doc(200);
+    doc["cfgver"]=cfgver;
+    doc["hostname"]=hostname;
     doc["timezoneoffset"]=timezoneoffset;
     doc["daylightsavingoffset"]=daylightsavingoffset;
     doc["brightness"]=brightness;

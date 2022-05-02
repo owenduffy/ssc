@@ -1,4 +1,6 @@
 {
+"cfgver":1,
+"hostname":"ssc00",
 "timezoneoffset":600,
 "daylightsavingoffset":60,
 "brightness":100,
