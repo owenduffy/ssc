@@ -1,8 +1,8 @@
 {
 "cfgver":1,
-"hostname":"ssc00",
+"hostname":"ssc02",
 "timezoneoffset":600,
 "daylightsavingoffset":60,
-"brightness":100,
+"brightness":100.25,
 "twelvehour":0
 }

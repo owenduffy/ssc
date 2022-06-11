@@ -5,7 +5,7 @@
 
 #define nMMSS 14 //D5
 #define nDST 12 //D6
-#define nDIM 13 //D7 +3.3-220k-nDim-phototransistor-gnd
+#define nDIM 13 //D7 +3.3-220k-nDim-phototransistor PT333-3C -gnd
 #define PIN_CLK 5 //D1
 #define PIN_DATA 4 //D2
 #define PIN_LATCH 0 //D3
