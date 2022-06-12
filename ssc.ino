@@ -1,7 +1,7 @@
 //SNTP syncronised clock for ESP8266 - NodeMCU 1.0 (ESP-12E Module)
 //Copyright: Owen Duffy    2021/05/16
 
-#define VERSION "0.01"
+#define VERSION "0.02"
 
 #define nMMSS 14 //D5
 #define nDST 12 //D6
@@ -81,6 +81,7 @@ WiFiManager wm;
 WiFiManagerParameter custom_field;
 int loopctr=0;
 bool dim;
+int wificfgpin=-1;
 
 //----------------------------------------------------------------------------------
 //callback notifying us of the need to save config
@@ -136,6 +137,9 @@ void cbSaveConfig () {
         brightness=json[F("brightness")];
         if(fmod(brightness,1)==0)brightness*=1.0025;
         twelvehour=json[F("twelvehour")];
+        if(json[F("wificfgpin")]>=0){
+          wificfgpin=json[F("wificfgpin")];
+        }
         Serial.print(F("hostname: "));
         Serial.println(hostname);
         Serial.print(F("timezoneoffset: "));
@@ -146,6 +150,8 @@ void cbSaveConfig () {
         Serial.println(brightness);
         Serial.print(F("twelvehour: "));
         Serial.println(twelvehour);
+        Serial.print(F("wificfgpin: "));
+        Serial.println(wificfgpin);
         return 0;
         }
       else{
@@ -286,23 +292,27 @@ void setup(){
 
   //reset settings - wipe credentials for testing
   //wm.resetSettings();
- 
-  wm.setDebugOutput(true);
-  wm.setHostname(hostname);
-  wm.setConfigPortalTimeout(120);
-  Serial.print(F(" connecting to "));
+  WiFiManager wifiManager;
+  wifiManager.setDebugOutput(true);
+  wifiManager.setHostname(hostname);
+  wifiManager.setConfigPortalTimeout(120);
+  if(wificfgpin>=0 && digitalRead(wificfgpin)==LOW){
+    Serial.println(F("Start on demand config portal."));
+    wifiManager.startConfigPortal(hostname);
+  }
+  else{
+    wifiManager.autoConnect(hostname);
+    Serial.println(F("Autoconnect, start config portal.")       );
+  }
+  if(WiFi.status()!=WL_CONNECTED){
+    Serial.println("WiFi autoconnect failed, resetting...");
+    ESP.restart(); //soft reboot
+    delay(1000);
+  }
+  else{
+  Serial.print(F("Connecting to "));
   Serial.println(WiFi.SSID());
-  wm.autoConnect(hostname);
-  if(WiFi.status()!=WL_CONNECTED)
-    {
-      Serial.println("WiFi autoconnect failed, resetting...");
-      ESP.restart(); //soft reboot
-      delay(1000);
-    }
-  
-  if(WiFi.status()==WL_CONNECTED){
-    Serial.println(WiFi.localIP().toString().c_str());
-
+  Serial.println(WiFi.localIP());
   strncpy(hostname,custom_hostname.getValue(),sizeof(hostname)-1);
   hostname[sizeof(hostname)]='\0';
   timezoneoffset=atoi(custom_timezoneoffset.getValue());

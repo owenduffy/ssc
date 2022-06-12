@@ -1,8 +1,10 @@
 {
 "cfgver":1,
-"hostname":"ssc02",
+"hostname":"ssc01",
 "timezoneoffset":600,
 "daylightsavingoffset":60,
-"brightness":100.25,
-"twelvehour":0
+"brightness":100.20,
+"twelvehour":0,
+"wificfgpin": 14
+
 }
