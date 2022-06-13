@@ -75,7 +75,7 @@ byte present = 0;
 byte data[12];
 float brightness=100.25;
 int timezoneoffset,daylightsavingoffset,twelvehour;
-char strtimezoneoffset[11]="600",strdaylightsavingoffset[11]="60",strbrightness[11]="100";
+char strtimezoneoffset[11]="600",strdaylightsavingoffset[11]="60",strbrightness[11]="100.20";
 bool shouldSaveConfig = false;
 WiFiManager wm;
 WiFiManagerParameter custom_field;
@@ -271,7 +271,7 @@ void setup(){
   WiFiManagerParameter custom_hostname("hostname","hostname",hostname,sizeof(hostname)-1);
   WiFiManagerParameter custom_timezoneoffset("timezoneoffset","Time zone offset (min)",strtimezoneoffset,10);
   WiFiManagerParameter custom_daylightsavingoffset("daylightsavingoffset","Daylight saving offset (min)",strdaylightsavingoffset,10);
-  WiFiManagerParameter custom_brightness("brightness","Brightness (0-100)",strbrightness,10);
+  WiFiManagerParameter custom_brightness("brightness","Brightness (0-100.*)",strbrightness,10);
   wm.addParameter(&custom_hostname);
   wm.addParameter(&custom_timezoneoffset);
   wm.addParameter(&custom_daylightsavingoffset);
@@ -292,16 +292,15 @@ void setup(){
 
   //reset settings - wipe credentials for testing
   //wm.resetSettings();
-  WiFiManager wifiManager;
-  wifiManager.setDebugOutput(true);
-  wifiManager.setHostname(hostname);
-  wifiManager.setConfigPortalTimeout(120);
+  wm.setDebugOutput(true);
+  wm.setHostname(hostname);
+  wm.setConfigPortalTimeout(120);
   if(wificfgpin>=0 && digitalRead(wificfgpin)==LOW){
     Serial.println(F("Start on demand config portal."));
-    wifiManager.startConfigPortal(hostname);
+    wm.startConfigPortal(hostname);
   }
   else{
-    wifiManager.autoConnect(hostname);
+    wm.autoConnect(hostname);
     Serial.println(F("Autoconnect, start config portal.")       );
   }
   if(WiFi.status()!=WL_CONNECTED){
