@@ -1,7 +1,7 @@
 //SNTP syncronised clock for ESP8266 - NodeMCU 1.0 (ESP-12E Module)
 //Copyright: Owen Duffy    2021/05/16
 
-#define VERSION "0.02"
+#define VERSION "0.03"
 
 #define nMMSS 14 //D5
 #define nDST 12 //D6
@@ -36,24 +36,25 @@ HT16K33 seg(0x70);
 
 #if defined(ARDUINO_ARCH_ESP8266)
 #include <ESP8266WiFi.h>
-//#include <ESP8266WebServer.h>
+#include <ESP8266WebServer.h>
+ESP8266WebServer  server;
+#include <ESP8266mDNS.h>
 #elif defined(ARDUINO_ARCH_ESP32)
 #include <WiFi.h>
-//#include <WebServer.h>
+#include <WebServer.h>
+WebServer  server;
+#include <ESPmDNS.h>
 #endif
+#define ARDUINOJSON_USE_DOUBLE 1
+#define ARDUINOJSON_USE_LONG_LONG 0
+#include <ArduinoJson.h>
+#include <PageBuilder.h>
+#define PAGEBUFRESSIZE 3000
+
+#include <WiFiManager.h>
 #include <WiFiUdp.h>
 #include <DNSServer.h>
 
-//#include <OneWire.h>
-//#include <PageBuilder.h>
-#if defined(ARDUINO_ARCH_ESP8266)
-//ESP8266WebServer  server;
-#elif defined(ARDUINO_ARCH_ESP32)
-//WebServer  server;
-#endif
-#include <WiFiManager.h>
-
-//const char ver[]=VERSION;
 char hostname[11]="ssc01";
 //Need global visibility of the config stuff
 DynamicJsonDocument doc(300);//arduinojson.org/assistant
@@ -130,7 +131,7 @@ void cbSaveConfig () {
         if(json[F("hostname")]){
 //          Serial.println("found hostname");
           strncpy(hostname,json[F("hostname")],sizeof(hostname)-1);
-          hostname[sizeof(hostname)]='\0';
+          hostname[sizeof(hostname)-1]='\0';
         }
         timezoneoffset=json[F("timezoneoffset")];
         daylightsavingoffset=json[F("daylightsavingoffset")];
@@ -174,6 +175,28 @@ void cbTick1(){
 //----------------------------------------------------------------------------------
 const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
 byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
+// send an NTP request to the time server at the given address
+void sendNTPpacket(IPAddress &address)
+{
+  // set all bytes in the buffer to 0
+  memset(packetBuffer,0,NTP_PACKET_SIZE);
+  // Initialize values needed to form NTP request
+  // (see URL above for details on the packets)
+  packetBuffer[0]=0b11100011; //LI, Version, Mode
+  packetBuffer[1]=0; //Stratum, or type of clock
+  packetBuffer[2]=6; //Polling Interval
+  packetBuffer[3]=0xEC; //Peer Clock Precision
+  //8 bytes of zero for Root Delay & Root Dispersion
+  packetBuffer[12]=49;
+  packetBuffer[13]=0x4E;
+  packetBuffer[14]=49;
+  packetBuffer[15]=52;
+  // all NTP fields have been given values, now
+  // you can send a packet requesting a timestamp:
+  udp.beginPacket(address,123); //NTP requests are to port 123
+  udp.write(packetBuffer,NTP_PACKET_SIZE);
+  udp.endPacket();
+}
 
 time_t getNtpTime()
 {
@@ -206,27 +229,14 @@ time_t getNtpTime()
   return 0; //return 0 if unable to get the time
 }
 
-// send an NTP request to the time server at the given address
-void sendNTPpacket(IPAddress &address)
-{
-  // set all bytes in the buffer to 0
-  memset(packetBuffer,0,NTP_PACKET_SIZE);
-  // Initialize values needed to form NTP request
-  // (see URL above for details on the packets)
-  packetBuffer[0]=0b11100011; //LI, Version, Mode
-  packetBuffer[1]=0; //Stratum, or type of clock
-  packetBuffer[2]=6; //Polling Interval
-  packetBuffer[3]=0xEC; //Peer Clock Precision
-  //8 bytes of zero for Root Delay & Root Dispersion
-  packetBuffer[12]=49;
-  packetBuffer[13]=0x4E;
-  packetBuffer[14]=49;
-  packetBuffer[15]=52;
-  // all NTP fields have been given values, now
-  // you can send a packet requesting a timestamp:
-  udp.beginPacket(address,123); //NTP requests are to port 123
-  udp.write(packetBuffer,NTP_PACKET_SIZE);
-  udp.endPacket();
+//----------------------------------------------------------------------------------
+String getParam(String name){
+  //read parameter from server, for customhmtl input
+  String value="";
+  if(wm.server->hasArg(name)) {
+    value = wm.server->arg(name);
+  }
+  return value;
 }
 //----------------------------------------------------------------------------------
 void cbSaveParams(){
@@ -237,15 +247,6 @@ void cbSaveParams(){
   brightness=(getParam(F("brightness"))).toFloat();
   if(fmod(brightness,1)==0)brightness*=1.25;
 //  Serial.println(twelvehour);
-}
-//----------------------------------------------------------------------------------
-String getParam(String name){
-  //read parameter from server, for customhmtl input
-  String value="";
-  if(wm.server->hasArg(name)) {
-    value = wm.server->arg(name);
-  }
-  return value;
 }
 //----------------------------------------------------------------------------------
 void setup(){
@@ -313,7 +314,7 @@ void setup(){
   Serial.println(WiFi.SSID());
   Serial.println(WiFi.localIP());
   strncpy(hostname,custom_hostname.getValue(),sizeof(hostname)-1);
-  hostname[sizeof(hostname)]='\0';
+  hostname[sizeof(hostname)-1]='\0';
   timezoneoffset=atoi(custom_timezoneoffset.getValue());
   daylightsavingoffset=atoi(custom_daylightsavingoffset.getValue());
   //twelvehour result is collected by cbSaveParams()
@@ -347,12 +348,16 @@ void setup(){
     Serial.println(F("IP address: "));
     Serial.println(WiFi.localIP());
     Serial.println(F("Hostname: "));
+#if defined(ARDUINO_ARCH_ESP8266)
     Serial.println(WiFi.hostname());
+#elif defined(ARDUINO_ARCH_ESP32)
+    Serial.println(WiFi.getHostname());
+#endif
 
     Serial.println(F("Starting UDP"));
     udp.begin(localPort);
     Serial.print(F("Local port: "));
-    Serial.println(udp.localPort());
+    Serial.println(localPort);
     Serial.println(F("waiting for sync"));
     setSyncProvider(getNtpTime);
     timeset=timeStatus()==timeSet;
