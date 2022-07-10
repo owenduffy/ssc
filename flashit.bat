@@ -1,5 +1,4 @@
 call vars.bat
-call bootapppath.bat
 
 set CHIP=%1
 
@@ -8,19 +7,16 @@ if #%1==#ESP32 goto ESP32
 goto end
 
 :ESP32
-goto end
-set BIN=EspRelay.ino.esp32.merged.bin
+rem goto end
+set BIN=.pio\build\esp32dev\firmware.bin
 
 echo Version:
 %ESPTOOL% version
 
 if #%2==# goto ESP32write
 
-rem use arduinobuilt to collect the files into current directory
-
 echo Merge:
-rem %ESPTOOL% -c %CHIP% -b %SPEED% -p %PORT% merge_bin -o %BIN% 0xe000 C:\Users\owen\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.2/tools/partitions/boot_app0.bin 0x1000 EspRelay.ino.bootloader.bin 0x10000 EspRelay.ino.esp32.bin 0x8000 EspRelay.ino.partitions.bin 
-%ESPTOOL% -c %CHIP% -b %SPEED% -p %PORT% merge_bin -o %BIN% 0xe000 %BOOTAPPPATH%boot_app0.bin 0x1000 EspRelay.ino.bootloader.bin 0x10000 EspRelay.ino.esp32.bin 0x8000 EspRelay.ino.partitions.bin 
+%ESPTOOL% -c %CHIP% merge_bin -o esp32-merged.bin 0x1000 %USERPROFILE%\.platformio\packages\framework-arduinoespressif32\tools\sdk\esp32\bin\bootloader_dio_40m.bin 0x8000 .pio\build\esp32dev\partitions.bin 0xe000 %USERPROFILE%\.platformio\packages\framework-arduinoespressif32\tools\partitions\boot_app0.bin  0x10000 %BIN%
 goto end
 
 :ESP32write
@@ -32,7 +28,7 @@ echo Verify:
 goto end
 
 :ESP8266
-set BIN=ssc.ino.generic.bin
+set BIN=.pio\build\esp12e\firmware.bin
 
 echo Version:
 %ESPTOOL% version

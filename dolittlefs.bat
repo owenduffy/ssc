@@ -10,9 +10,11 @@ goto end
 :ESP8266
 echo Processing ESP8266
 rem generic (FS:64KB OTA:~470KB)
+rem eagle.flash.1m64.ld
 set FSSIZE=0x10000
 set FSLOC=0x0eb000
-set FSBKSIZE=4096
+rem set FSBKSIZE=4096
+set FSBKSIZE=0x1000
 goto makeit
 
 :ESP32
