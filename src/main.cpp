@@ -1,7 +1,7 @@
 //SNTP syncronised clock for ESP8266 - NodeMCU 1.0 (ESP-12E Module)
 //Copyright: Owen Duffy    2021/05/16
 
-#define VERSION "0.03"
+#define VERSION "0.04"
 
 #define nMMSS 14 //D5
 #define nDST 12 //D6
@@ -16,7 +16,6 @@
 #define HAVE_HT16K33
 
 #include <LittleFS.h>
-#include <ArduinoJson.h> // https://github.com/bblanchon/ArduinoJson
 #include <TimeLib.h>
 #include <Wire.h> 
 #include <LiquidCrystal_I2C.h>
@@ -48,7 +47,7 @@ WebServer  server;
 #endif
 #define ARDUINOJSON_USE_DOUBLE 1
 #define ARDUINOJSON_USE_LONG_LONG 0
-#include <ArduinoJson.h>
+#include <ArduinoJson.h> // https://github.com/bblanchon/ArduinoJson
 #include <PageBuilder.h>
 #define PAGEBUFRESSIZE 3000
 
