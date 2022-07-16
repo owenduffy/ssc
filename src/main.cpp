@@ -9,6 +9,7 @@
 #define PIN_CLK 5 //D1
 #define PIN_DATA 4 //D2
 #define PIN_LATCH 0 //D3
+#define RESYNC 7200
 
 //#define HAVE_TM1637
 //#define HAVE_SR74HC595
@@ -361,7 +362,7 @@ void setup(){
     Serial.println(F("waiting for sync"));
     setSyncProvider(getNtpTime);
     timeset=timeStatus()==timeSet;
-    setSyncInterval(8*3600);
+    setSyncInterval(RESYNC);
     }
 #ifdef HAVE_TM1637
     tm.init();
