@@ -216,6 +216,7 @@ time_t getNtpTime()
     int size=udp.parsePacket();
     if(size>=NTP_PACKET_SIZE){
       Serial.println(F("Received NTP response"));
+      ticker1.detach();
       udp.read(packetBuffer,NTP_PACKET_SIZE); //read packet into the buffer
       unsigned long secsSince1900;
       // convert four bytes starting at location 40 to a long integer
@@ -224,6 +225,7 @@ time_t getNtpTime()
       secsSince1900|=(unsigned long)packetBuffer[42]<<8;
       secsSince1900|=(unsigned long)packetBuffer[43];
       delay(400);
+      ticker1.attach_ms(500,cbTick1);
       return secsSince1900-2208988800UL+timeZone*SECS_PER_HOUR+1;
     }
   }
@@ -374,8 +376,6 @@ void setup(){
     seg.displayOn();
     seg.setDigits(4);
 #endif
-
-  ticker1.attach_ms(500,cbTick1);
 }
 //----------------------------------------------------------------------------------
 void loop(){
