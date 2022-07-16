@@ -8,7 +8,7 @@ goto end
 
 :ESP32
 rem goto end
-set BIN=.pio\build\esp32dev\firmware.bin
+set BIN=.pio\build\esp32dev-HT16K33\firmware.bin
 
 echo Version:
 %ESPTOOL% version
@@ -28,7 +28,7 @@ echo Verify:
 goto end
 
 :ESP8266
-set BIN=.pio\build\esp12e\firmware.bin
+set BIN=.pio\build\esp12e-HT16K33\firmware.bin
 
 echo Version:
 %ESPTOOL% version

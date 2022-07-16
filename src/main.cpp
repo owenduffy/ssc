@@ -13,7 +13,7 @@
 
 //#define HAVE_TM1637
 //#define HAVE_SR74HC595
-#define HAVE_HT16K33
+//#define HAVE_HT16K33
 
 #include <LittleFS.h>
 #include <TimeLib.h>
