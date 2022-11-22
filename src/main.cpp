@@ -141,7 +141,6 @@ void cbSaveConfig () {
         if(json[F("wificfgpin")]>=0){
           wificfgpin=json[F("wificfgpin")];
         }
-//wificfgpin=14;
         Serial.print(F("hostname: "));
         Serial.println(hostname);
         Serial.print(F("timezoneoffset: "));
