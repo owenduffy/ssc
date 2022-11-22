@@ -76,7 +76,7 @@ byte present = 0;
 byte data[12];
 float brightness=100.25;
 int timezoneoffset,daylightsavingoffset,twelvehour;
-char strtimezoneoffset[11]="600",strdaylightsavingoffset[11]="60",strbrightness[11]="100.20";
+char strtimezoneoffset[11]="600",strdaylightsavingoffset[11]="60",strbrightness[11]="100.20",strwificfgpin[4]="-1";
 bool shouldSaveConfig = false;
 WiFiManager wm;
 WiFiManagerParameter custom_field;
@@ -141,6 +141,7 @@ void cbSaveConfig () {
         if(json[F("wificfgpin")]>=0){
           wificfgpin=json[F("wificfgpin")];
         }
+//wificfgpin=14;
         Serial.print(F("hostname: "));
         Serial.println(hostname);
         Serial.print(F("timezoneoffset: "));
@@ -249,6 +250,7 @@ void cbSaveParams(){
   twelvehour=(getParam(F("twelvehour"))).toInt();
   brightness=(getParam(F("brightness"))).toFloat();
   if(fmod(brightness,1)==0)brightness*=1.25;
+  wificfgpin=(getParam(F("wificfgpin"))).toInt();
 //  Serial.println(twelvehour);
 }
 //----------------------------------------------------------------------------------
@@ -276,10 +278,12 @@ void setup(){
   WiFiManagerParameter custom_timezoneoffset("timezoneoffset","Time zone offset (min)",strtimezoneoffset,10);
   WiFiManagerParameter custom_daylightsavingoffset("daylightsavingoffset","Daylight saving offset (min)",strdaylightsavingoffset,10);
   WiFiManagerParameter custom_brightness("brightness","Brightness (0-100.*)",strbrightness,10);
+  WiFiManagerParameter custom_wificfgpin("wificfgpin","WiFiManager pin",strwificfgpin,4);
   wm.addParameter(&custom_hostname);
   wm.addParameter(&custom_timezoneoffset);
   wm.addParameter(&custom_daylightsavingoffset);
   wm.addParameter(&custom_brightness);
+  wm.addParameter(&custom_wificfgpin);
   String custom_radio_str;
   custom_radio_str.reserve(500);
   custom_radio_str=F("<p>Select 12/24 hour display:</p>");
@@ -332,6 +336,7 @@ void setup(){
     doc["daylightsavingoffset"]=daylightsavingoffset;
     doc["brightness"]=brightness;
     doc["twelvehour"]=twelvehour;
+    doc["wificfgpin"]=wificfgpin;
     File configFile = LittleFS.open("/config.json", "w");
     if (!configFile) {
       Serial.println(F("failed to open config file for writing"));
