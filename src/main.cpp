@@ -1,7 +1,8 @@
 //SNTP syncronised clock for ESP8266 - NodeMCU 1.0 (ESP-12E Module)
 //Copyright: Owen Duffy    2021/05/16
 
-#define VERSION "0.04"
+#define VERSION "0.05"
+//#define WM_DEBUG_LEVEL DEBUG_VERBOSE
 
 #define nMMSS 14 //D5
 #define nDST 12 //D6
@@ -307,7 +308,8 @@ void setup(){
     wm.startConfigPortal(hostname);
   }
   else{
-    wm.autoConnect(hostname);
+  //  wm.autoConnect(hostname);
+    wm.autoConnect("ssc-config");
     Serial.println(F("Autoconnect, start config portal.")       );
   }
   if(WiFi.status()!=WL_CONNECTED){
