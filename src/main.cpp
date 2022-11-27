@@ -1,7 +1,7 @@
 //SNTP syncronised clock for ESP8266 - NodeMCU 1.0 (ESP-12E Module)
 //Copyright: Owen Duffy    2021/05/16
 
-#define VERSION "0.05"
+#define VERSION "0.06"
 //#define WM_DEBUG_LEVEL DEBUG_VERBOSE
 
 #define nMMSS 14 //D5
@@ -207,6 +207,10 @@ time_t getNtpTime()
   Serial.println(F("Transmit NTP Request"));
   // get a random server from the pool
   WiFi.hostByName(ntpServerName,ntpServerIP);
+  if(ntpServerIP==IPADDR_NONE){
+    Serial.print(F("hostByName failed."));
+    return 0;
+  }
   Serial.print(ntpServerName);
   Serial.print(F(": "));
   Serial.println(ntpServerIP);
@@ -255,7 +259,14 @@ void cbSaveParams(){
 }
 //----------------------------------------------------------------------------------
 void setup(){
-  WiFi.mode(WIFI_OFF);
+  //stuff to try and connect to the TPLINK C24 AP reliably  
+  //WiFi.mode(WIFI_OFF);
+  WiFi.disconnect();
+  wm.setCleanConnect(true); // disconnect before connect, clean connect
+  WiFi.mode(WIFI_STA);
+  wm.setConnectTimeout(10);
+  wm.setConnectRetries(3);
+  //wm.setCleanConnect(true); // disconnect before connect, clean connect
   //WiFi.setAutoConnect(true);
   Serial.begin(9600);
   while (!Serial){;} // wait for serial port to connect. Needed for Leonardo only
@@ -293,7 +304,7 @@ void setup(){
   custom_radio_str+=F("<input style='width: auto; margin: 0 10px 0 10px;' type='radio' name='twelvehour' value='1' ");
   if(twelvehour)custom_radio_str+=F("checked ");
   custom_radio_str+=F(">12 hour<br>");
-//  Serial.println(custom_radio_str);
+  //Serial.println(custom_radio_str);
   new (&custom_field) WiFiManagerParameter(custom_radio_str.c_str()); // custom html input
   wm.addParameter(&custom_field);
   wm.setSaveParamsCallback(cbSaveParams);
@@ -309,8 +320,9 @@ void setup(){
   }
   else{
   //  wm.autoConnect(hostname);
-    wm.autoConnect("ssc-config");
+  //  WiFi.mode(WIFI_STA);
     Serial.println(F("Autoconnect, start config portal.")       );
+    wm.autoConnect("ssc-config");
   }
   if(WiFi.status()!=WL_CONNECTED){
     Serial.println("WiFi autoconnect failed, resetting...");
@@ -388,6 +400,7 @@ void loop(){
     tick1Occured = false;
     t=now()+timezoneoffset*60;
     if(!digitalRead(nDST))t+=daylightsavingoffset*60;
+    if(timeStatus()==timeNeedsSync)loopctr=1;
 #ifdef HAVE_TM1637
     if(!(loopctr&0x3f))dim=digitalRead(nDIM);
     if(dim)tm.setBrightness(max(int(fmod(brightness,1)*7),1));
